@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Ping Pong</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      background: #fef7ff;
+      text-align: center;
+      font-family: 'Comic Sans MS', cursive;
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      background: #cde9ff;
+      display: block;
+      margin: 10px auto;
+      border: 4px solid #333;
+      border-radius: 12px;
+      touch-action: none;
+    }
+    #scoreboard {
+      font-size: 14px;
+      margin: 0;
+      color: #444;
+    }
+    #startScreen, #endScreen, #countdownOverlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(255,255,255,0.9);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 2;
+    }
+    #countdownOverlay {
+      font-size: 40px;
+      color: #ff4081;
+      display: none;
+      z-index: 4;
+    }
+    button {
+      padding: 6px 14px;
+      font-size: 14px;
+      border: none;
+      background: #ff80ab;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 6px;
+    }
+    #languageBtn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <button id="languageBtn">BM</button>
+  <div id="startScreen">
+    <h1 id="startTitle" style="font-size: 18px;">🏓 Mini Ping Pong: You vs AI!</h1>
+    <button onclick="setDifficulty('easy')">Easy</button>
+    <button onclick="setDifficulty('hard')">Hard</button>
+  </div>
+  <div id="countdownOverlay">3</div>
+  <div id="endScreen" style="display:none">
+    <h1 id="endMessage" style="font-size: 18px;">Game Over!</h1>
+    <button onclick="restartGame()" id="restartBtn">Restart</button>
+  </div>
+  <div id="scoreboard">You: 0 | AI: 0</div>
+  <canvas id="pong" width="360" height="240"></canvas>
+  <audio id="hitSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+  <audio id="scoreSound" src="https://www.soundjay.com/button/button-16.wav"></audio>
+  <audio id="winSound" src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3"></audio>
+  <audio id="loseSound" src="https://www.soundjay.com/button/beep-10.mp3"></audio>
+  <script>
+    const canvas = document.getElementById("pong");
+    const ctx = canvas.getContext("2d");
+    const paddleHeight = 60, paddleWidth = 10;
+    const player = { x: 10, y: 90, score: 0 };
+    const ai = { x: canvas.width - paddleWidth - 10, y: 90, score: 0 };
+    const ball = { x: canvas.width / 2, y: canvas.height / 2, radius: 8, speed: 4, dx: 4, dy: 4 };
+    const hitSound = document.getElementById("hitSound");
+    const scoreSound = document.getElementById("scoreSound");
+    const winSound = document.getElementById("winSound");
+    const loseSound = document.getElementById("loseSound");
+    let difficulty = 'easy';
+    let ease = 0.03;
+    const maxScore = 11;
+    let language = 'EN';
+    const text = {
+      EN: {
+        startTitle: "🏓 Mini Ping Pong: You vs AI!",
+        endMsg: "Game Over!",
+        restart: "Restart",
+        score: (p, a) => `You: ${p} | AI: ${a}`,
+        langBtn: "BM",
+        win: "You Win!",
+        lose: "AI Wins!"
+      },
+      BM: {
+        startTitle: "🏓 Ping Pong Mini: Kamu vs AI!",
+        endMsg: "Permainan Tamat!",
+        restart: "Main Semula",
+        score: (p, a) => `Kamu: ${p} | AI: ${a}`,
+        langBtn: "EN",
+        win: "Kamu Menang!",
+        lose: "AI Menang!"
+      }
+    };
+    function drawRect(x, y, w, h, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, w, h);
+    }
+    function drawCircle(x, y, r, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    function resetBall() {
+      ball.x = canvas.width / 2;
+      ball.y = canvas.height / 2;
+      ball.dx = -ball.dx;
+      ball.speed = 4;
+    }
+    function updateScore() {
+      document.getElementById("scoreboard").innerText = text[language].score(player.score, ai.score);
+    }
+    function draw() {
+      drawRect(0, 0, canvas.width, canvas.height, "#cde9ff");
+      drawRect(player.x, player.y, paddleWidth, paddleHeight, "#ff80ab");
+      drawRect(ai.x, ai.y, paddleWidth, paddleHeight, "#80d8ff");
+      drawCircle(ball.x, ball.y, ball.radius, "#ffca28");
+    }
+    function movePaddles() {
+      ai.y += ((ball.y - (ai.y + paddleHeight / 2))) * ease;
+    }
+    function collision(b, p) {
+      return b.x < p.x + paddleWidth && b.x > p.x && b.y < p.y + paddleHeight && b.y > p.y;
+    }
+    function update() {
+      ball.x += ball.dx;
+      ball.y += ball.dy;
+      if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) ball.dy = -ball.dy;
+      let currentPlayer = ball.x < canvas.width / 2 ? player : ai;
+      if (collision(ball, currentPlayer)) {
+        ball.dx = -ball.dx;
+        ball.speed += 0.1;
+        hitSound.play();
+      }
+      if (ball.x - ball.radius < 0) {
+        ai.score++;
+        scoreSound.play();
+        updateScore();
+        resetBall();
+        checkEnd();
+      } else if (ball.x + ball.radius > canvas.width) {
+        player.score++;
+        scoreSound.play();
+        updateScore();
+        resetBall();
+        checkEnd();
+      }
+    }
+    function checkEnd() {
+      if (player.score >= maxScore || ai.score >= maxScore) {
+        const won = player.score > ai.score;
+        document.getElementById("endMessage").innerText = won ? text[language].win : text[language].lose;
+        document.getElementById("endScreen").style.display = "flex";
+        (won ? winSound : loseSound).play();
+        cancelAnimationFrame(animId);
+      }
+    }
+    let animId;
+    function game() {
+      update();
+      draw();
+      movePaddles();
+      animId = requestAnimationFrame(game);
+    }
+    function startCountdownAndGame() {
+      let count = 3;
+      const overlay = document.getElementById("countdownOverlay");
+      overlay.innerText = count;
+      overlay.style.display = "flex";
+      const countdown = setInterval(() => {
+        count--;
+        if (count === 0) {
+          overlay.innerText = "GO!";
+        } else if (count < 0) {
+          overlay.style.display = "none";
+          clearInterval(countdown);
+          player.score = 0;
+          ai.score = 0;
+          updateScore();
+          game();
+        } else {
+          overlay.innerText = count;
+        }
+      }, 1000);
+    }
+    function setDifficulty(mode) {
+      difficulty = mode;
+      ease = (mode === 'hard') ? 0.07 : 0.03;
+      document.getElementById("startScreen").style.display = "none";
+      startCountdownAndGame();
+    }
+    function restartGame() {
+      document.getElementById("endScreen").style.display = "none";
+      setDifficulty(difficulty);
+    }
+    function getTouchY(evt) {
+      return evt.touches[0].clientY - canvas.getBoundingClientRect().top;
+    }
+    canvas.addEventListener("mousemove", function(evt) {
+      let rect = canvas.getBoundingClientRect();
+      player.y = evt.clientY - rect.top - paddleHeight / 2;
+    });
+    canvas.addEventListener("touchmove", function(evt) {
+      evt.preventDefault();
+      player.y = getTouchY(evt) - paddleHeight / 2;
+    }, { passive: false });
+    document.getElementById("languageBtn").addEventListener("click", () => {
+      language = language === 'EN' ? 'BM' : 'EN';
+      document.getElementById("startTitle").innerText = text[language].startTitle;
+      document.getElementById("endMessage").innerText = text[language].endMsg;
+      document.getElementById("restartBtn").innerText = text[language].restart;
+      document.getElementById("languageBtn").innerText = text[language].langBtn;
+      updateScore();
+    });
+  </script>
+</body>
+</html>
